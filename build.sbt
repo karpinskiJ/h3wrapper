@@ -12,5 +12,7 @@ libraryDependencies ++= Seq(
 //  "org.apache.sedona" %% "sedona-python-adapter-3.0" % "1.4.1",
 //  "org.apache.sedona" %% "sedona-viz-3.0" % "1.4.1",
   "org.apache.sedona" %% "sedona-spark-shaded-3.0" % "1.5.0",
-  "org.datasyslab" % "geotools-wrapper" % "1.5.0-28.2"
+  "org.datasyslab" % "geotools-wrapper" % "1.5.0-28.2",
+"org.scalatest" %% "scalatest" % "3.0.5" % "test",
+  "com.uber" % "h3" % "4.1.1"
 )

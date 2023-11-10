@@ -1,64 +1,100 @@
 package h3xwrapper
 
 import org.apache.spark.sql.{Column, DataFrame}
-import org.apache.spark.sql.functions.{array_contains, col, concat, datediff, explode, udf}
-import org.apache.spark.sql.sedona_sql.expressions.st_functions.{ST_Centroid, ST_GeometryType, ST_H3CellIDs}
-import org.apache.spark.sql.sedona_sql.expressions.st_predicates.ST_Contains
-import org.locationtech.jts.geom.Geometry
+import org.apache.spark.sql.functions.{col, count, explode, size}
+import org.apache.spark.sql.sedona_sql.expressions.st_functions.ST_H3KRing
 import h3xwrapper.Constants.h3_index
+import h3xwrapper.utils.{Spatial, getH3EdgeLength}
+
+import scala.math
 
 package object predicate {
-  def intersectsJoin(innerObjectDf: DataFrame, innerObjectColId: String,
-                   outerObjectDf: DataFrame, outerObjectColId: String
-                  ): DataFrame = {
-    val innerObjectDfExploded = innerObjectDf
+
+
+  def polygonContainsPointJoin(polygonDf: DataFrame,
+                               polygonIdColName: String,
+                               polygonColName: String,
+                               pointDf: DataFrame,
+                               pointIdColName: String,
+                               pointColName: String, h3Resolution: Option[Int] = None): DataFrame = {
+    val (polygonDfTransformed, pointDfTransformed): (DataFrame, DataFrame) = h3Resolution match {
+      case Some(resolution) => (polygonDf.getGeometryInH3Exploded(polygonColName, resolution), pointDf.getPointInH3(pointColName, resolution))
+      case None => (polygonDf.withColumn(h3_index, explode(col(h3_index))), pointDf)
+    }
+    polygonDfTransformed.join(pointDfTransformed,
+      Seq(h3_index)
+    ).dropDuplicates(polygonIdColName, pointIdColName).drop(h3_index)
+  }
+
+
+  def polygonContainsPolygonJoin(outerPolygonDf: DataFrame,
+                                 outerPolygonIdColName: String,
+                                 outerPolygonColName: String,
+                                 innerPolygonDf: DataFrame,
+                                 innerPolygonIdColName: String,
+                                 innerPolygonColName: String,
+                                 h3Resolution: Option[Int] = None
+                                ): DataFrame = {
+
+    def transformInnerPolygonDf(df: DataFrame): DataFrame =
+      df.withColumn("h3_indexes_number", size(col(h3_index)))
+        .withColumn(h3_index, explode(col(h3_index)))
+
+
+    val (outerPolygonDfTransformed, innerPolygonDfTransformed): (DataFrame, DataFrame) = h3Resolution match {
+      case Some(resolution) => (outerPolygonDf.getGeometryInH3Exploded(outerPolygonColName, resolution),
+        transformInnerPolygonDf(innerPolygonDf.getGeometryBoundaryInH3(innerPolygonColName, resolution)))
+      case None => (outerPolygonDf.withColumn(h3_index, explode(col(h3_index))), transformInnerPolygonDf(innerPolygonDf))
+    }
+    outerPolygonDfTransformed
+      .join(innerPolygonDfTransformed, Seq(h3_index))
+      .groupBy(outerPolygonIdColName, innerPolygonIdColName, "h3_indexes_number")
+      .agg(count(innerPolygonIdColName).as("h3_indexes_matched"))
+      .where(col("h3_indexes_matched") === col("h3_indexes_number"))
+      .drop("h3_indexes_number", "h3_indexes_matched")
+
+  }
+
+
+  def polygonIntersectsPolygon(filledPolygonDf: DataFrame
+                               , filledPolygonIdColName: String
+                               , filledPolygonColName: String
+                               , boundaryPolygonDf: DataFrame
+                               , boundaryPolygonId: String
+                               , boundaryColName: String
+                               , h3Resolution: Option[Int] = None): DataFrame = {
+
+    val (filledPolygonDfTransformed, boundaryPolygonDfTransformed): (DataFrame, DataFrame) = h3Resolution match {
+      case Some(resolution) => (filledPolygonDf.getGeometryInH3Exploded(filledPolygonColName, resolution),
+        boundaryPolygonDf.getGeometryBoundaryInH3(boundaryColName, resolution).withColumn(h3_index, explode(col(h3_index)))
+      )
+      case None => (filledPolygonDf.withColumn(h3_index, explode(col(h3_index))), boundaryPolygonDf.withColumn(h3_index, explode(col(h3_index))))
+    }
+    filledPolygonDfTransformed.join(boundaryPolygonDfTransformed, Seq(h3_index)).dropDuplicates(filledPolygonIdColName, boundaryPolygonId)
+  }
+
+  def getPointsInRangeFromPoints(pointsDfSource: DataFrame
+                                 , sourceIdCol: String
+                                 , sourceGeometryCol: String
+                                 , pointsDfTarget: DataFrame
+                                 , targetIdCol: String
+                                 , targetGeometryCol: String
+                                 , range: Double
+                                 , h3Resolution: Int): DataFrame = {
+
+    val k: Int = transformMetersToK(range, h3Resolution)
+    val pointsDfSourceTransformedToH3Range: DataFrame = pointsDfSource
+      .getPolygonInH3(sourceGeometryCol, h3Resolution)
+      .withColumn(h3_index, col(h3_index).getItem(0))
+      .withColumn(h3_index, ST_H3KRing(col(h3_index), k, false))
       .withColumn(h3_index, explode(col(h3_index)))
-    val outerObjectDfExploded = outerObjectDf
-      .withColumn(h3_index, explode(col(h3_index)))
-    outerObjectDfExploded
-      .join(innerObjectDfExploded, Seq(h3_index))
-      .dropDuplicates(innerObjectColId, outerObjectColId)
+    val pointsDfTargetTransformedToH3: DataFrame = pointsDfTarget.getPolygonInH3(targetGeometryCol, h3Resolution).withColumn(h3_index, col(h3_index).getItem(0))
+    pointsDfSourceTransformedToH3Range.join(pointsDfTargetTransformedToH3, Seq(h3_index))
+      .dropDuplicates(sourceIdCol, targetIdCol)
+
   }
 
-private  def h3ContainsPredicate(outerH3Index: Column,innerH3Index:Column): Column = {
-    val h3ContainsPredicateUdf = udf { (outerH3Index:List[Long],innerH3Index:List[Long]) => {
-      innerH3Index.forall(x=>outerH3Index.contains(x))
-    }}
-    h3ContainsPredicateUdf(outerH3Index,innerH3Index)
-  }
-  def containsJoin(innerObjectDf: DataFrame,
-                   outerObjectDf: DataFrame
-                  ): DataFrame = {
-    val innerColName:String = s"inner_${h3_index}"
-    val outerColName:String = s"outer_${h3_index}"
-
-    val innerDf:DataFrame = innerObjectDf.withColumnRenamed(h3_index,innerColName)
-    val outerDf:DataFrame = outerObjectDf.withColumnRenamed(h3_index,outerColName)
-    innerDf.join(outerDf,h3ContainsPredicate(col(innerColName),col(outerColName)))
-  }
-
-
-
-
-//  private def addH3Buffer(df: DataFrame): DataFrame = {
-//    df.withColumn()
-//
-//
-//  }
-//
-//
-//
-//  def rangeJoinPoints(innerObjectDf: DataFrame, innerObjectColId: String,
-//                outerObjectDf: DataFrame, outerObjectColId: String): DataFrame = {
-//
-//
-//
-//
-//
-//  }
-//
-//
-//}
-
+  def transformMetersToK(range: Double, h3Resolution: Int): Int =
+    (math.sqrt(3) * (range - 1) / (getH3EdgeLength(h3Resolution) * 3)).toInt
 
 }

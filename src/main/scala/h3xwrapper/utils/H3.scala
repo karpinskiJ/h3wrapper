@@ -1,4 +1,4 @@
-package h3xwrapper.h3
+package h3xwrapper.utils
 
 import com.uber.h3core.H3Core
 

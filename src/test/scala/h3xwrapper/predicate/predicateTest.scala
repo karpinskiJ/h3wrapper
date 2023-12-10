@@ -1,20 +1,16 @@
 package h3xwrapper.predicate
 
 
-import com.uber.h3core.util
+
+import h3xwrapper.experiments.runExperiments
 import org.apache.sedona.core.serde.SedonaKryoRegistrator
 import org.apache.sedona.spark.SedonaContext
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql.{DataFrame, SparkSession, functions}
 import org.scalatest.FlatSpec
 import org.scalatest.BeforeAndAfter
-import h3xwrapper.utils.Spatial
-import org.apache.spark.sql.functions.col
-import org.apache.spark.sql.sedona_sql.expressions.st_functions.{ST_Buffer, ST_Distance, ST_H3CellDistance, ST_H3KRing}
-import org.apache.spark.sql.sedona_sql.expressions.st_predicates.ST_Intersects
-import org.apache.spark.sql.sedona_sql.expressions.st_predicates.ST_Contains
+import org.apache.spark.sql.functions.{avg, col, expr, lit}
 
-import scala.jdk.CollectionConverters.asScalaBufferConverter
 
 class predicateTest extends FlatSpec with BeforeAndAfter {
 
@@ -37,86 +33,105 @@ class predicateTest extends FlatSpec with BeforeAndAfter {
     df.select(colName1, colName2)
       .collect().toList.map(x => (x.getAs[String](colName1), x.getAs[String](colName2))).sorted
 
-  "polygonContainsPointJoin" should "map points which belong to polygon if datasets do not contain h3 indexes" in {
-    val h3Result = polygonContainsPointJoin(zipcodeShapes
-      , "zc_id"
-      , "zc_shape"
-      , poiPoints
-      , "point_id"
-      , "point"
-      , Some(10)
-    )
-    val sedonaResult = zipcodeShapes.join(poiPoints, ST_Contains("zc_shape", "point"))
-    assertResult(transformResultsToList(sedonaResult, "zc_id", "point_id"))(transformResultsToList(h3Result, "zc_id", "point_id"))
-  }
-  "polygonContainsPointJoin" should "map points which belong to polygon if datasets contain h3_index" in {
-    val h3Result = polygonContainsPointJoin(zipcodeShapes.getPolygonInH3("zc_shape", 10)
-      , "zc_id"
-      , "zc_shape"
-      , poiPoints.getPointInH3("point", 10)
-      , "point_id"
-      , "point"
-    )
-    val sedonaResult = zipcodeShapes.join(poiPoints, ST_Contains("zc_shape", "point"))
+
+  "pointInPolygonJoin" should "map records, if polygon contains point" in {
+    val h3Result = h3.pointInPolygonJoin(zipcodeShapes, "zc_shape", poiPoints, "point", 7)
+    val sedonaResult = sedona.pointInPolygonJoin(zipcodeShapes, "zc_shape", poiPoints, "point")
+    h3Result.explain()
+    sedonaResult.explain()
+    assertResult(sedonaResult.count())(h3Result.count())
     assertResult(transformResultsToList(sedonaResult, "zc_id", "point_id"))(transformResultsToList(h3Result, "zc_id", "point_id"))
   }
 
-  "polygonContainsPolygonJoin" should "map polygons which are included in other polygons" in {
-    val h3Result = polygonContainsPolygonJoin(zipcodeShapes
+  "geometryInsidePolygonJoin" should "map records if geometry is inside polygon" in {
+    val h3Result = h3.geometryInsidePolygonJoin(blockGroupShapes
+      , "bg_shape"
+      , zipcodeShapes
+      , "zc_shape"
+      , 7)
+
+    val sedonaResult = sedona.geometryInsidePolygonJoin(blockGroupShapes
+      , "bg_shape"
+      , zipcodeShapes
+      , "zc_shape")
+
+    h3Result.explain()
+    sedonaResult.explain()
+    assertResult(sedonaResult.count())(h3Result.count())
+    assertResult(transformResultsToList(sedonaResult, "zc_id", "bg_id"))(transformResultsToList(h3Result, "zc_id", "bg_id"))
+  }
+
+  "geometriesIntersectJoin" should "map polygons which intersects each other" in {
+    val h3Result = h3.geometriesIntersectJoin(zipcodeShapes
+      , "zc_shape"
       , "zc_id"
+      , blockGroupShapes
+      , "bg_shape"
+      , "bg_id"
+      , 7)
+
+    val sedonaResult = sedona.geometriesIntersectJoin(zipcodeShapes
       , "zc_shape"
       , blockGroupShapes
-      , "bg_id"
-      , "bg_shape"
-      , Some(11)
-    )
+      , "bg_shape")
 
-    val sedonaResult = zipcodeShapes.join(blockGroupShapes, ST_Contains("zc_shape", "bg_shape"))
+    assertResult(sedonaResult.count())(h3Result.count())
     assertResult(transformResultsToList(sedonaResult, "zc_id", "bg_id"))(transformResultsToList(h3Result, "zc_id", "bg_id"))
   }
 
-  "polygonContainsPolygonJoin" should "map polygons which are included in other polygons if input datasets contain h3 indexes" in {
-    val h3Result = polygonContainsPolygonJoin(zipcodeShapes.getPolygonInH3("zc_shape", 11)
-      , "zc_id"
-      , "zc_shape"
-      , blockGroupShapes.getGeometryBoundaryInH3("bg_shape", 11)
-      , "bg_id"
-      , "bg_shape"
-    )
-
-    val sedonaResult = zipcodeShapes.join(blockGroupShapes, ST_Contains("zc_shape", "bg_shape"))
-    assertResult(transformResultsToList(sedonaResult, "zc_id", "bg_id"))(transformResultsToList(h3Result, "zc_id", "bg_id"))
-  }
-
-  "polygonIntersectsPolygon" should "map polygons which intersects each other" in {
-    val h3Result = polygonIntersectsPolygon(zipcodeShapes
-      , "zc_id"
-      , "zc_shape"
-      , blockGroupShapes
-      , "bg_id"
-      , "bg_shape"
-        ,Some(11)
-    )
-    val sedonaResult = zipcodeShapes.join(blockGroupShapes, ST_Intersects("zc_shape", "bg_shape"))
-    assertResult(transformResultsToList(sedonaResult, "zc_id", "bg_id"))(transformResultsToList(h3Result, "zc_id", "bg_id"))
-  }
 
   "getPointsInRangeFromPoints" should "return points in defined range from other points" in {
     val pointsSource: DataFrame = poiPoints
     val pointsTarget: DataFrame = poiPoints.select(col("point").as("point2"), col("point_id").as("point_id2"))
 
-    val h3Result = getPointsInRangeFromPoints(poiPoints
-      , "point_id"
-      , "point"
-      , pointsTarget
-      , "point_id2"
-      , "point2"
-      , 1000.0
-      , 10
-    )
+    val h3Result = h3.getPointsInRangeFromPoints(poiPoints, "point", pointsTarget, "point2", 10000.0, 7)
+    val sedonaResult = sedona.sedonaGetPointsInRangeFromPoints(pointsSource, "point", pointsTarget, "point2", 10000)
 
-    val sedonaResult = pointsSource.join(pointsTarget).where(ST_Distance("point", "point2") < 0.01)
+    assertResult(sedonaResult.count())(h3Result.count())
     assertResult(transformResultsToList(sedonaResult, "point_id", "point_id2"))(transformResultsToList(h3Result, "point_id", "point_id2"))
   }
+
+
+  "getPointsInRangeFromPolygon" should "return points in defined range from polygon" in {
+    val h3Result = h3.getPointsInRangeFromPolygon(zipcodeShapes
+      , "zc_shape"
+      , poiPoints
+      , "point"
+      , 10000.0
+      , 7
+    )
+
+    val sedonaResult =
+      sedona.sedonaGetGeometryInRangeFromPolygon(
+        zipcodeShapes
+        , "zc_shape"
+        , poiPoints
+        , "point"
+        , 10000.0)
+
+
+    assertResult(sedonaResult.count)(h3Result.count())
+    assertResult(transformResultsToList(sedonaResult, "point_id", "zc_id"))(transformResultsToList(h3Result, "point_id", "zc_id"))
+  }
+  "getPolygonsInRangeFromPolygon" should "return points in defined range from polygon" in {
+
+    val h3Result = h3.getPolygonsInRangeFromPolygons(zipcodeShapes
+      , "zc_shape"
+      , blockGroupShapes
+      , "bg_shape"
+      , 10000
+      , 7)
+
+    val sedonaResult =
+      sedona.sedonaGetGeometryInRangeFromPolygon(zipcodeShapes
+        , "zc_shape"
+        , blockGroupShapes
+        , "bg_shape"
+        , 10000)
+
+    assertResult(sedonaResult.count())(h3Result.count())
+    assertResult(transformResultsToList(sedonaResult, "bg_id", "zc_id"))(transformResultsToList(h3Result, "bg_id", "zc_id"))
+  }
+
 
 }

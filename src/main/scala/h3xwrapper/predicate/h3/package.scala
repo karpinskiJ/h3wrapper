@@ -13,16 +13,14 @@ package object h3 {
                          , pointsDataFrame: DataFrame
                          , pointColName: String
                          , h3Resolution: Int = 7
-                         , distanceTolerance: Double = 0.001
                         ): DataFrame = {
-    val polygonsDataFrameCheckPointed: DataFrame =
-      polygonsDataFrame.repartition(100)
-        .localCheckpoint()
     val polygonsTransformed: DataFrame =
-      polygonsDataFrameCheckPointed
-        .getGeometryInH3Exploded(polygonColName, h3Resolution, distanceTolerance)
+      polygonsDataFrame
+        .getGeometryInH3Exploded(polygonColName, h3Resolution)
+
     val pointsTransformed: DataFrame = pointsDataFrame
       .getPointInH3(pointColName, h3Resolution)
+
     polygonsTransformed.join(pointsTransformed, Seq(h3_index))
       .drop(h3_index)
       .where(ST_Contains(polygonColName, pointColName))
@@ -32,17 +30,17 @@ package object h3 {
                                 , geometryColName: String
                                 , polygonDataFrame: DataFrame
                                 , polygonColName: String
-                                , h3Resolution: Int = 7
-                                , distanceTolerance: Double = 0.001): DataFrame = {
-    val polygonsCheckPointed: DataFrame = polygonDataFrame.repartition(100).localCheckpoint()
-    val polygonTransformed: DataFrame = polygonsCheckPointed
-      .getGeometryInH3Exploded(polygonColName, h3Resolution, distanceTolerance)
+                                , h3Resolution: Int = 7): DataFrame = {
+
+    val polygonTransformed: DataFrame = polygonDataFrame
+      .withColumn(h3_index, ST_H3CellIDs(polygonColName, h3Resolution, true))
+      .withColumn(h3_index, explode(col(h3_index)))
 
     val geometryTransformed: DataFrame = geometryDataFrame
-      .addGeometryCentroidColumn(geometryColName, geometry_centroid, distanceTolerance)
+      .addGeometryCentroidColumn(geometryColName, geometry_centroid)
       .getPointInH3(geometry_centroid, h3Resolution)
       .drop(geometry_centroid)
-      .localCheckpoint()
+
     polygonTransformed.join(geometryTransformed, Seq(h3_index))
       .drop(h3_index)
       .where(ST_Contains(polygonColName, geometryColName))
@@ -55,18 +53,18 @@ package object h3 {
                               , geometryDataFrame2: DataFrame
                               , geometryColName2: String
                               , geometryIdColName2: String
-                              , h3Resolution: Int = 7
-                              , distanceTolerance: Double = 0.001): DataFrame = {
+                              , h3Resolution: Int = 7): DataFrame = {
     val geometryFilledWithH3: DataFrame = geometryDataFrame1
-      .getGeometryInH3Exploded(geometryColName1, h3Resolution, distanceTolerance)
+      .getGeometryInH3Exploded(geometryColName1, h3Resolution)
 
     val geometryH3Boundary: DataFrame = geometryDataFrame2
-      .getGeometryBoundaryInH3Exploded(geometryColName2, h3Resolution, distanceTolerance)
+      .getGeometryBoundary(geometryColName2)
+      .getGeometryInH3Exploded(s"${geometryColName2}_boundary", h3Resolution)
+      .drop(s"${geometryColName2}_boundary")
 
     geometryFilledWithH3.join(geometryH3Boundary, Seq(h3_index))
       .where(ST_Intersects(geometryColName1, geometryColName2))
       .dropDuplicates(geometryIdColName1, geometryIdColName2)
-
   }
 
 
@@ -79,6 +77,9 @@ package object h3 {
                                  , sourceCrs: String = "epsg:4326"
                                  , targetCrs: String = "epsg:2163"
                                 ): DataFrame = {
+    val sourceGeometryInMeterColName = s"meter_$sourceGeometryCol"
+    val targetGeometryInMeterColName = s"meter_$targetGeometryCol"
+
     def transformMetersToK(range: Double, h3Resolution: Int): Int =
       (math.sqrt(3) * (range - 1) / (getH3EdgeLength(h3Resolution) * 3)).toInt
 
@@ -90,12 +91,10 @@ package object h3 {
       .getPointInH3(targetGeometryCol, h3Resolution)
 
     pointsDfSourceTransformedToH3Range.join(pointsDfTargetTransformedToH3, Seq(h3_index))
-      .transformCrs(sourceGeometryCol, sourceGeometryCol, targetCrs, sourceCrs)
-      .transformCrs(targetGeometryCol, targetGeometryCol, targetCrs, sourceCrs)
+      .transformCrs(sourceGeometryInMeterColName, sourceGeometryCol, targetCrs, sourceCrs)
+      .transformCrs(targetGeometryInMeterColName, targetGeometryCol, targetCrs, sourceCrs)
       .where(ST_Distance(sourceGeometryCol, targetGeometryCol) <= range)
-      .transformCrs(sourceGeometryCol, sourceGeometryCol, sourceCrs, targetCrs)
-      .transformCrs(targetGeometryCol, targetGeometryCol, sourceCrs, targetCrs)
-
+      .drop(sourceGeometryInMeterColName, targetGeometryInMeterColName)
   }
 
   def getPointsInRangeFromPolygon(polygonsDfSource: DataFrame
@@ -106,30 +105,22 @@ package object h3 {
                                   , h3Resolution: Int
                                   , sourceCrs: String = "epsg:4326"
                                   , targetCrs: String = "epsg:2163"
-                                  , distanceTolerance: Double = 0.001
                                  ): DataFrame = {
     val sourceGeometryColMeterName = s"meter_${sourceGeometryCol}"
     val targetGeometryColMeterName = s"meter_${targetGeometryCol}"
     val bufferColumnName = s"buffer_${sourceGeometryCol}"
 
-    val polygonsDataFrameCheckPointed: DataFrame =
-      polygonsDfSource.repartition(100)
-        .localCheckpoint()
-
     val polygonsTransformedWithBuffer: DataFrame =
-      polygonsDataFrameCheckPointed
-        .getGeometrySimplified(sourceGeometryCol, distanceTolerance)
+      polygonsDfSource
         .transformCrs(sourceGeometryColMeterName, sourceGeometryCol, targetCrs, sourceCrs)
         .withColumn(bufferColumnName, ST_Buffer(sourceGeometryColMeterName, range))
         .transformCrs(bufferColumnName, bufferColumnName, sourceCrs, targetCrs)
         .withColumn(h3_index, explode(ST_H3CellIDs(bufferColumnName, h3Resolution, true)))
         .drop(bufferColumnName)
 
-
     val pointsTransformed: DataFrame = pointsDfTarget
       .getPointInH3(targetGeometryCol, h3Resolution)
       .transformCrs(targetGeometryColMeterName, targetGeometryCol, targetCrs, sourceCrs)
-
     polygonsTransformedWithBuffer.join(pointsTransformed, Seq(h3_index))
       .where(ST_Distance(sourceGeometryColMeterName, targetGeometryColMeterName) <= range)
       .drop(sourceGeometryColMeterName, targetGeometryColMeterName)
@@ -142,35 +133,29 @@ package object h3 {
                                      , range: Double
                                      , h3Resolution: Int
                                      , sourceCrs: String = "epsg:4326"
-                                     , targetCrs: String = "epsg:2163"
-                                     , distanceTolerance: Double = 0.001): DataFrame = {
+                                     , targetCrs: String = "epsg:2163"): DataFrame = {
     val sourceGeometryColMeterName = s"meter_${sourceGeometryCol}"
     val targetGeometryColMeterName = s"meter_${targetGeometryCol}"
     val bufferColumnName = s"buffer_${sourceGeometryCol}"
 
 
-    val polygonsDataFrameCheckPointed: DataFrame =
-      polygonsDfSource.repartition(100)
-        .localCheckpoint()
-
     val polygonsTransformedWithBuffer: DataFrame =
-      polygonsDataFrameCheckPointed
-        .getGeometrySimplified(sourceGeometryCol, distanceTolerance)
+      polygonsDfSource
         .transformCrs(sourceGeometryColMeterName, sourceGeometryCol, targetCrs, sourceCrs)
-        .withColumn(bufferColumnName, ST_Buffer(sourceGeometryColMeterName, range*1.5) )
-        .transformCrs(bufferColumnName,bufferColumnName,sourceCrs,targetCrs)
-        .withColumn(h3_index, explode(ST_H3CellIDs(bufferColumnName, h3Resolution, true)))
+        .withColumn(bufferColumnName, ST_Buffer(sourceGeometryColMeterName, range * 1.5))
+        .transformCrs(bufferColumnName, bufferColumnName, sourceCrs, targetCrs)
+        .getGeometryInH3Exploded(bufferColumnName, h3Resolution)
         .drop(bufferColumnName)
 
 
-    val targetPolygonsTransformed: DataFrame = polygonsDfTarget.getGeometrySimplified(targetGeometryCol, distanceTolerance)
-      .addGeometryCentroidColumn(targetGeometryCol, geometry_centroid, distanceTolerance)
+    val targetPolygonsTransformed: DataFrame = polygonsDfTarget
+      .addGeometryCentroidColumn(targetGeometryCol, geometry_centroid)
       .getPointInH3(geometry_centroid, h3Resolution)
       .drop(geometry_centroid)
-
+      .transformCrs(targetGeometryColMeterName, targetGeometryCol, targetCrs, sourceCrs)
 
     polygonsTransformedWithBuffer
-      .join(targetPolygonsTransformed.transformCrs(targetGeometryColMeterName, targetGeometryCol, targetCrs, sourceCrs), Seq(h3_index))
+      .join(targetPolygonsTransformed, Seq(h3_index))
       .where(ST_Distance(sourceGeometryColMeterName, targetGeometryColMeterName) <= range)
       .drop(sourceGeometryColMeterName, targetGeometryColMeterName)
   }

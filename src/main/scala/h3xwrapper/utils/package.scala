@@ -5,14 +5,11 @@ import h3xwrapper.Constants.h3_index
 import org.apache.sedona.core.formatMapper.shapefileParser.ShapefileReader
 import org.apache.sedona.core.spatialRDD.SpatialRDD
 import org.apache.sedona.sql.utils.Adapter
-
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.sedona_sql.expressions.st_functions._
 import org.locationtech.jts.geom.Geometry
-
 import scala.jdk.CollectionConverters.asScalaBufferConverter
-
 
 package object utils {
 
@@ -20,20 +17,18 @@ package object utils {
     val rdd: SpatialRDD[Geometry] = ShapefileReader.readToGeometryRDD(spark.sparkContext, path)
     Adapter.toDf(rdd, spark)
   }
+
   implicit class Spatial(df: DataFrame) {
 
-
-
-    def getH3Range(pointColName:String,h3Resolution:Int ,k:Int):DataFrame = {
+    def getH3Range(pointColName: String, h3Resolution: Int, k: Int): DataFrame = {
       df
-        .getPointInH3(pointColName,h3Resolution)
+        .getPointInH3(pointColName, h3Resolution)
         .withColumn(h3_index, explode(ST_H3KRing(col(h3_index), k, false)))
     }
 
 
-    def addGeometryCentroidColumn(geometryColName:String,centroidColName:String,distanceTolerance:Double):DataFrame = {
-      df.getGeometrySimplified(geometryColName,distanceTolerance)
-        .withColumn(centroidColName,ST_Centroid(geometryColName))
+    def addGeometryCentroidColumn(geometryColName: String, centroidColName: String): DataFrame = {
+      df.withColumn(centroidColName, ST_Centroid(geometryColName))
     }
 
     def transformCrs(targetColName: String, sourceColName: String, targetCrs: String = "epsg:2163", sourceCrs: String = "epsg:4326"): DataFrame =
@@ -43,36 +38,27 @@ package object utils {
     def getGeometryBoundary(geometryColName: String): DataFrame =
       df.withColumn(s"${geometryColName}_boundary", ST_Boundary(geometryColName))
 
-    def getGeometrySimplified(geometryColName: String, distanceTolerance: Double ): DataFrame =
+    def getGeometrySimplified(geometryColName: String, distanceTolerance: Double): DataFrame =
       df.withColumn(geometryColName, ST_SimplifyPreserveTopology(geometryColName, distanceTolerance))
 
-    def getPolygonInH3(polygonColName: String, h3Resolution: Int, distanceTolerance: Double ): DataFrame = {
-      df.getGeometrySimplified(polygonColName, distanceTolerance)
-        .withColumn(h3_index, ST_H3CellIDs(polygonColName, h3Resolution, true))
+    def getPolygonInH3(polygonColName: String, h3Resolution: Int): DataFrame = {
+      df.withColumn(h3_index, ST_H3CellIDs(polygonColName, h3Resolution, true))
     }
 
     def getPointInH3(pointColName: String, h3Resolution: Int): DataFrame = {
       df.withColumn(h3_index, ST_H3CellIDs(pointColName, h3Resolution, false).getItem(0))
     }
 
-    def getGeometryInH3Exploded(geometryColName: String, h3Resolution: Int, distanceTolerance: Double ): DataFrame = {
-      df.getPolygonInH3(geometryColName, h3Resolution, distanceTolerance)
+    def getGeometryInH3Exploded(geometryColName: String, h3Resolution: Int): DataFrame = {
+      df.getPolygonInH3(geometryColName, h3Resolution)
         .withColumn(h3_index, explode(col(h3_index)))
     }
-
 
 
     def createH3ShapeColumn(): DataFrame =
       df.withColumn(s"${h3_index}_shape", getH3Shape(col(h3_index)))
 
-    def getGeometryBoundaryInH3Exploded(geometryColName: String, h3Resolution: Int, distanceTolerance: Double = 0.01): DataFrame = {
-      df
-        .getGeometrySimplified(geometryColName, distanceTolerance)
-        .getGeometryBoundary(geometryColName)
-        .withColumn(h3_index, ST_H3CellIDs(s"${geometryColName}_boundary", h3Resolution, false))
-        .withColumn(h3_index,explode(col(h3_index)))
-        .drop(s"${geometryColName}_boundary")
-    }
+
   }
 
   def getH3EdgeLength(h3Resolution: Int): Double = H3.instance.getHexagonEdgeLengthAvg(h3Resolution, LengthUnit.m)

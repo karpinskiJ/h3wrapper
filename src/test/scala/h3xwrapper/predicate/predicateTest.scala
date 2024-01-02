@@ -1,8 +1,6 @@
 package h3xwrapper.predicate
 
 
-
-import h3xwrapper.experiments.runExperiments
 import org.apache.sedona.core.serde.SedonaKryoRegistrator
 import org.apache.sedona.spark.SedonaContext
 import org.apache.spark.serializer.KryoSerializer
@@ -98,7 +96,7 @@ class predicateTest extends FlatSpec with BeforeAndAfter {
       , poiPoints
       , "point"
       , 10000.0
-      , 7
+      , 10
     )
 
     val sedonaResult =
@@ -119,15 +117,15 @@ class predicateTest extends FlatSpec with BeforeAndAfter {
       , "zc_shape"
       , blockGroupShapes
       , "bg_shape"
-      , 10000
-      , 7)
+      , 5000
+      , 8)
 
     val sedonaResult =
       sedona.sedonaGetGeometryInRangeFromPolygon(zipcodeShapes
         , "zc_shape"
         , blockGroupShapes
         , "bg_shape"
-        , 10000)
+        , 5000)
 
     assertResult(sedonaResult.count())(h3Result.count())
     assertResult(transformResultsToList(sedonaResult, "bg_id", "zc_id"))(transformResultsToList(h3Result, "bg_id", "zc_id"))

@@ -44,21 +44,5 @@ package object experiments {
 
   }
 
-  def runExperiments(spark: SparkSession)(basePath: String, experimentId: String, joinColumns: Seq[String], h3Resolutions: Seq[Int], sedonaFunction: => DataFrame, h3Function: Int => DataFrame): DataFrame = {
-    val sedonaResult = runSedonaExperiment(spark)(basePath, experimentId, sedonaFunction)
-
-    val qualityMetrics = {
-      for {h3Res <- h3Resolutions
-           h3Result = runH3Experiment(spark)(basePath, experimentId, h3Res, h3Function)
-           quality = qualityCheck(spark)(basePath, experimentId, h3Res, joinColumns)
-           } yield h3Result.join(quality, Seq("id", "h3_resolution"))
-    }.reduceLeft(_.unionByName(_)).join(sedonaResult, Seq("id"))
-
-    writeParquet(s"$basePath/$experimentId", "SUMMARY", qualityMetrics)
-    qualityMetrics
-
-
-  }
-
 
 }

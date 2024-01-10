@@ -8,6 +8,16 @@ import org.apache.spark.sql.sedona_sql.expressions.st_functions.{ST_Buffer, ST_D
 import org.apache.spark.sql.sedona_sql.expressions.st_predicates.{ST_Contains, ST_Intersects}
 
 package object h3 {
+  /**
+   * Performs a spatial join operation between polygons and points using H3 indexing.
+   *
+   * @param polygonsDataFrame The DataFrame containing polygons.
+   * @param polygonColName    The name of the column containing polygon geometries.
+   * @param pointsDataFrame   The DataFrame containing points.
+   * @param pointColName      The name of the column containing point geometries.
+   * @param h3Resolution      The H3 resolution level (default is 7).
+   * @return A DataFrame with joined data based on spatial containment.
+   */
   def pointInPolygonJoin(polygonsDataFrame: DataFrame
                          , polygonColName: String
                          , pointsDataFrame: DataFrame
@@ -26,6 +36,16 @@ package object h3 {
       .where(ST_Contains(polygonColName, pointColName))
   }
 
+  /**
+   * Performs a spatial join operation between geometries and polygons using H3 indexing.
+   *
+   * @param geometryDataFrame The DataFrame containing geometries.
+   * @param geometryColName   The name of the column containing geometry geometries.
+   * @param polygonDataFrame  The DataFrame containing polygons.
+   * @param polygonColName    The name of the column containing polygon geometries.
+   * @param h3Resolution      The H3 resolution level (default is 7).
+   * @return A DataFrame with joined data based on spatial containment.
+   */
   def geometryInsidePolygonJoin(geometryDataFrame: DataFrame
                                 , geometryColName: String
                                 , polygonDataFrame: DataFrame
@@ -46,6 +66,18 @@ package object h3 {
       .where(ST_Contains(polygonColName, geometryColName))
   }
 
+  /**
+   * Performs a spatial join operation between two sets of geometries based on H3 indexing.
+   *
+   * @param geometryDataFrame1 The first DataFrame containing geometries.
+   * @param geometryColName1   The name of the column containing geometries in the first DataFrame.
+   * @param geometryIdColName1 The name of the column containing unique identifiers for the first DataFrame.
+   * @param geometryDataFrame2 The second DataFrame containing geometries.
+   * @param geometryColName2   The name of the column containing geometries in the second DataFrame.
+   * @param geometryIdColName2 The name of the column containing unique identifiers for the second DataFrame.
+   * @param h3Resolution       The H3 resolution level (default is 7).
+   * @return A DataFrame with joined data based on spatial intersection.
+   */
 
   def geometriesIntersectJoin(geometryDataFrame1: DataFrame
                               , geometryColName1: String
@@ -67,7 +99,19 @@ package object h3 {
       .dropDuplicates(geometryIdColName1, geometryIdColName2)
   }
 
-
+  /**
+   * Retrieves points from a source DataFrame that fall within a specified range from points in a target DataFrame.
+   *
+   * @param pointsDfSource    The source DataFrame containing points.
+   * @param sourceGeometryCol The name of the column containing point geometries in the source DataFrame.
+   * @param pointsDfTarget    The target DataFrame containing points.
+   * @param targetGeometryCol The name of the column containing point geometries in the target DataFrame.
+   * @param range             The spatial range in meters.
+   * @param h3Resolution      The H3 resolution level.
+   * @param sourceCrs         The coordinate reference system of the source DataFrame (default is "epsg:4326").
+   * @param targetCrs         The coordinate reference system of the target DataFrame (default is "epsg:2163").
+   * @return A DataFrame with points that meet the spatial criteria.
+   */
   def getPointsInRangeFromPoints(pointsDfSource: DataFrame
                                  , sourceGeometryCol: String
                                  , pointsDfTarget: DataFrame
@@ -97,6 +141,19 @@ package object h3 {
       .drop(sourceGeometryInMeterColName, targetGeometryInMeterColName)
   }
 
+  /**
+   * Retrieves points from a source DataFrame that fall within a specified range from polygons in a target DataFrame.
+   *
+   * @param polygonsDfSource  The source DataFrame containing polygons.
+   * @param sourceGeometryCol The name of the column containing polygon geometries in the source DataFrame.
+   * @param pointsDfTarget    The target DataFrame containing points.
+   * @param targetGeometryCol The name of the column containing point geometries in the target DataFrame.
+   * @param range             The spatial range in meters.
+   * @param h3Resolution      The H3 resolution level.
+   * @param sourceCrs         The coordinate reference system of the source DataFrame (default is "epsg:4326").
+   * @param targetCrs         The coordinate reference system of the target DataFrame (default is "epsg:2163").
+   * @return A DataFrame with points that meet the spatial criteria.
+   */
   def getPointsInRangeFromPolygon(polygonsDfSource: DataFrame
                                   , sourceGeometryCol: String
                                   , pointsDfTarget: DataFrame
@@ -126,6 +183,19 @@ package object h3 {
       .drop(sourceGeometryColMeterName, targetGeometryColMeterName)
   }
 
+  /**
+   * Retrieves polygons from a source DataFrame that fall within a specified range from polygons in a target DataFrame.
+   *
+   * @param polygonsDfSource  The source DataFrame containing polygons.
+   * @param sourceGeometryCol The name of the column containing polygon geometries in the source DataFrame.
+   * @param polygonsDfTarget  The target DataFrame containing polygons.
+   * @param targetGeometryCol The name of the column containing polygon geometries in the target DataFrame.
+   * @param range             The spatial range in meters.
+   * @param h3Resolution      The H3 resolution level.
+   * @param sourceCrs         The coordinate reference system of the source DataFrame (default is "epsg:4326").
+   * @param targetCrs         The coordinate reference system of the target DataFrame (default is "epsg:2163").
+   * @return A DataFrame with polygons that meet the spatial criteria.
+   */
   def getPolygonsInRangeFromPolygons(polygonsDfSource: DataFrame
                                      , sourceGeometryCol: String
                                      , polygonsDfTarget: DataFrame

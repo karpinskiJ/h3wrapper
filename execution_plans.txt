@@ -1,0 +1,183 @@
+PolygonContainsPoints
+
+H3:
+== Physical Plan ==
+*(2) Project [zc_id#16, zc_shape#17, zc_shape_wkt#18, point#6, point_id#7, lat#8, long#9, point_wkt#10]
++- BroadcastHashJoin [h3_index#34L], [h3_index#39L], Inner, BuildRight,  **org.apache.spark.sql.sedona_sql.expressions.ST_Contains**  , false
+   :- *(1) Filter isnotnull(h3_index#34L)
+   :  +- Generate explode(h3_index#28), [zc_id#16, zc_shape#17, zc_shape_wkt#18], false, [h3_index#34L]
+   :     +- Project [zc_id#16, zc_shape#17, zc_shape_wkt#18,  **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**   AS h3_index#28]
+   :        +- Filter (((size( **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  , true) > 0) AND isnotnull( **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  ))
+   AND isnotnull(zc_shape#17))
+   :           +- FileScan parquet [zc_id#16,zc_shape#17,zc_shape_wkt#18] Batched: false, DataFilters: [(size( **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  , true) > 0),
+   isnotnull( **..., Format: Parquet, Location: InMemoryFileIndex[file:/C:/projects/h3xwrapper/data/ZIP_CODE_SHAPES_TEST], PartitionFilters: [], PushedFilters: [IsNotNull(zc_shape)], ReadSchema: struct<zc_id:string,zc_shape:binary,zc_shape_wkt:string>
+   +- BroadcastExchange HashedRelationBroadcastMode(List(input[5, bigint, true]),false), [id=#31]
+      +- Project [point#6, point_id#7, lat#8, long#9, point_wkt#10,  **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  [0] AS h3_index#39L]
+         +- Filter (isnotnull(point#6) AND isnotnull( **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  [0]))
+            +- FileScan parquet [point#6,point_id#7,lat#8,long#9,point_wkt#10] Batched: false, DataFilters: [isnotnull(point#6), isnotnull( **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  [0])], Format: Parquet
+			, Location: InMemoryFileIndex[file:/C:/projects/h3xwrapper/data/POI_TEST], PartitionFilters: [], PushedFilters: [IsNotNull(point)], ReadSchema: struct<point:binary,point_id:string,lat:double,long:double,point_wkt:string>
+
+
+
+SEDONA:
+== Physical Plan ==
+BroadcastIndexJoin zc_shape#17: geometry, RightSide, LeftSide, Inner, CONTAINS ST_CONTAINS(zc_shape#17, point#6)
+:- *(1) Filter isnotnull(zc_shape#17)
+:  +- FileScan parquet [zc_id#16,zc_shape#17,zc_shape_wkt#18] Batched: false, DataFilters: [isnotnull(zc_shape#17)], Format: Parquet, Location: InMemoryFileIndex[file:/C:/projects/h3xwrapper/data/ZIP_CODE_SHAPES_TEST], PartitionFilters: [], PushedFilters: [IsNotNull(zc_shape)], ReadSchema: struct<zc_id:string,zc_shape:binary,zc_shape_wkt:string>
++- SpatialIndex point#6: geometry, QUADTREE, false, false
+   +- *(2) Filter isnotnull(point#6)
+      +- FileScan parquet [point#6,point_id#7,lat#8,long#9,point_wkt#10] Batched: false, DataFilters: [isnotnull(point#6)], Format: Parquet, Location: InMemoryFileIndex[file:/C:/projects/h3xwrapper/data/POI_TEST], PartitionFilters: [], PushedFilters: [IsNotNull(point)], ReadSchema: struct<point:binary,point_id:string,lat:double,long:double,point_wkt:string>
+	  
+	  
+
+
+GeometryInsidePolygon
+
+H3:
+
++- BroadcastHashJoin [h3_index#34L], [h3_index#44L], Inner, BuildRight,  **org.apache.spark.sql.sedona_sql.expressions.ST_Contains**  , false
+   :- *(1) Filter isnotnull(h3_index#34L)
+   :  +- Generate explode(h3_index#28), [zc_id#16, zc_shape#17, zc_shape_wkt#18], false, [h3_index#34L]
+   :     +- Project [zc_id#16, zc_shape#17, zc_shape_wkt#18,  **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**   AS h3_index#28]
+   :        +- Filter (((size( **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  , true) > 0) AND isnotnull( **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  )) AND isnotnull(zc_shape#17))
+   :           +- FileScan parquet [zc_id#16,zc_shape#17,zc_shape_wkt#18] Batched: false, DataFilters: [(size( **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  , true) > 0), isnotnull( **..., Format: Parquet, Location: InMemoryFileIndex[file:/C:/projects/h3xwrapper/data/ZIP_CODE_SHAPES_TEST], PartitionFilters: [], PushedFilters: [IsNotNull(zc_shape)], ReadSchema: struct<zc_id:string,zc_shape:binary,zc_shape_wkt:string>
+   +- BroadcastExchange HashedRelationBroadcastMode(List(input[3, bigint, true]),false), [id=#31]
+      +- Project [bg_id#22, bg_shape#23, bg_shape_wkt#24,  **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  [0] AS h3_index#44L]
+         +- Filter (isnotnull(bg_shape#23) AND isnotnull( **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  [0]))
+            +- FileScan parquet [bg_id#22,bg_shape#23,bg_shape_wkt#24] Batched: false, DataFilters: [isnotnull(bg_shape#23), isnotnull( **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs** ..., Format: Parquet, Location: InMemoryFileIndex[file:/C:/projects/h3xwrapper/data/BLOCK_GROUP_SHAPES_TEST], PartitionFilters: [], PushedFilters: [IsNotNull(bg_shape)], ReadSchema: struct<bg_id:string,bg_shape:binary,bg_shape_wkt:string>
+
+SEDONA:
+BroadcastIndexJoin zc_shape#17: geometry, LeftSide, RightSide, Inner, CONTAINS ST_CONTAINS(zc_shape#17, bg_shape#23)
+:- SpatialIndex bg_shape#23: geometry, QUADTREE, false, false
+:  +- *(1) Filter isnotnull(bg_shape#23)
+:     +- FileScan parquet [bg_id#22,bg_shape#23,bg_shape_wkt#24] Batched: false, DataFilters: [isnotnull(bg_shape#23)], Format: Parquet, Location: InMemoryFileIndex[file:/C:/projects/h3xwrapper/data/BLOCK_GROUP_SHAPES_TEST], PartitionFilters: [], PushedFilters: [IsNotNull(bg_shape)], ReadSchema: struct<bg_id:string,bg_shape:binary,bg_shape_wkt:string>
++- *(2) Filter isnotnull(zc_shape#17)
+   +- FileScan parquet [zc_id#16,zc_shape#17,zc_shape_wkt#18] Batched: false, DataFilters: [isnotnull(zc_shape#17)], Format: Parquet, Location: InMemoryFileIndex[file:/C:/projects/h3xwrapper/data/ZIP_CODE_SHAPES_TEST], PartitionFilters: [], PushedFilters: [IsNotNull(zc_shape)], ReadSchema: struct<zc_id:string,zc_shape:binary,zc_shape_wkt:string>
+
+
+
+
+GEOMETRIES_INTERSECT_JOIN
+
+H3:
+== Physical Plan ==
+SortAggregate(key=[zc_id#16, bg_id#22], functions=[first(h3_index#34L, false), first(zc_shape#17, false), first(zc_shape_wkt#18, false), first(bg_shape#23, false), first(bg_shape_wkt#24, false)])
++- *(4) Sort [zc_id#16 ASC NULLS FIRST, bg_id#22 ASC NULLS FIRST], false, 0
+   +- Exchange hashpartitioning(zc_id#16, bg_id#22, 200), ENSURE_REQUIREMENTS, [id=#69]
+      +- SortAggregate(key=[zc_id#16, bg_id#22], functions=[partial_first(h3_index#34L, false), partial_first(zc_shape#17, false), partial_first(zc_shape_wkt#18, false), partial_first(bg_shape#23, false), partial_first(bg_shape_wkt#24, false)])
+         +- *(3) Sort [zc_id#16 ASC NULLS FIRST, bg_id#22 ASC NULLS FIRST], false, 0
+            +- *(3) Project [h3_index#34L, zc_id#16, zc_shape#17, zc_shape_wkt#18, bg_id#22, bg_shape#23, bg_shape_wkt#24]
+               +- BroadcastHashJoin [h3_index#34L], [h3_index#51L], Inner, BuildRight,  **org.apache.spark.sql.sedona_sql.expressions.ST_Intersects**  , false
+                  :- *(1) Filter isnotnull(h3_index#34L)
+                  :  +- Generate explode(h3_index#28), [zc_id#16, zc_shape#17, zc_shape_wkt#18], false, [h3_index#34L]
+                  :     +- Project [zc_id#16, zc_shape#17, zc_shape_wkt#18,  **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**   AS h3_index#28]
+                  :        +- Filter (((size( **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  , true) > 0) AND isnotnull( **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  )) AND isnotnull(zc_shape#17))
+                  :           +- FileScan parquet [zc_id#16,zc_shape#17,zc_shape_wkt#18] Batched: false, DataFilters: [(size( **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  , true) > 0), isnotnull( **..., Format: Parquet, Location: InMemoryFileIndex[file:/C:/projects/h3xwrapper/data/ZIP_CODE_SHAPES_TEST], PartitionFilters: [], PushedFilters: [IsNotNull(zc_shape)], ReadSchema: struct<zc_id:string,zc_shape:binary,zc_shape_wkt:string>
+                  +- BroadcastExchange HashedRelationBroadcastMode(List(input[3, bigint, false]),false), [id=#62]
+                     +- *(2) Filter isnotnull(h3_index#51L)
+                        +- Generate explode(h3_index#44), [bg_id#22, bg_shape#23, bg_shape_wkt#24], false, [h3_index#51L]
+                           +- Project [bg_id#22, bg_shape#23, bg_shape_wkt#24,  **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**   AS h3_index#44]
+                              +- Filter (((size( **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  , true) > 0) AND isnotnull( **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  )) AND isnotnull(bg_shape#23))
+                                 +- FileScan parquet [bg_id#22,bg_shape#23,bg_shape_wkt#24] Batched: false, DataFilters: [(size( **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  , true) > 0), isnotnull( **..., Format: Parquet, Location: InMemoryFileIndex[file:/C:/projects/h3xwrapper/data/BLOCK_GROUP_SHAPES_TEST], PartitionFilters: [], PushedFilters: [IsNotNull(bg_shape)], ReadSchema: struct<bg_id:string,bg_shape:binary,bg_shape_wkt:string>
+
+
+
+
+SEDONA:
+
+BroadcastIndexJoin zc_shape#17: geometry, RightSide, RightSide, Inner, INTERSECTS ST_INTERSECTS(bg_shape#23, zc_shape#17)
+:- *(1) Filter isnotnull(zc_shape#17)
+:  +- FileScan parquet [zc_id#16,zc_shape#17,zc_shape_wkt#18] Batched: false, DataFilters: [isnotnull(zc_shape#17)], Format: Parquet, Location: InMemoryFileIndex[file:/C:/projects/h3xwrapper/data/ZIP_CODE_SHAPES_TEST], PartitionFilters: [], PushedFilters: [IsNotNull(zc_shape)], ReadSchema: struct<zc_id:string,zc_shape:binary,zc_shape_wkt:string>
++- SpatialIndex bg_shape#23: geometry, QUADTREE, false, false
+   +- *(2) Filter isnotnull(bg_shape#23)
+      +- FileScan parquet [bg_id#22,bg_shape#23,bg_shape_wkt#24] Batched: false, DataFilters: [isnotnull(bg_shape#23)], Format: Parquet, Location: InMemoryFileIndex[file:/C:/projects/h3xwrapper/data/BLOCK_GROUP_SHAPES_TEST], PartitionFilters: [], PushedFilters: [IsNotNull(bg_shape)], ReadSchema: struct<bg_id:string,bg_shape:binary,bg_shape_wkt:string>
+
+
+
+
+
+POINTS_IN_RANGE_FROM_POINTS
+H3:
+
+== Physical Plan ==
+*(2) Project [h3_index#40L, point#6, point_id#7, lat#8, long#9, point_wkt#10, point2#28, point_id2#29]
++- BroadcastHashJoin [h3_index#40L], [h3_index#47L], Inner, BuildRight, ( **org.apache.spark.sql.sedona_sql.expressions.ST_Distance**   <= 1000.0), false
+   :- *(1) Filter isnotnull(h3_index#40L)
+   :  +- Generate explode( **org.apache.spark.sql.sedona_sql.expressions.ST_H3KRing**  ), [point#6, point_id#7, lat#8, long#9, point_wkt#10], false, [h3_index#40L]
+   :     +- Project [point#6, point_id#7, lat#8, long#9, point_wkt#10,  **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  [0] AS h3_index#32L]
+   :        +- Filter ((size( **org.apache.spark.sql.sedona_sql.expressions.ST_H3KRing**  , true) > 0) AND isnotnull( **org.apache.spark.sql.sedona_sql.expressions.ST_H3KRing**  ))
+   :           +- FileScan parquet [point#6,point_id#7,lat#8,long#9,point_wkt#10] Batched: false, DataFilters: [(size( **org.apache.spark.sql.sedona_sql.expressions.ST_H3KRing**  , true) > 0), isnotnull( **or..., Format: Parquet, Location: InMemoryFileIndex[file:/C:/projects/h3xwrapper/data/POI_TEST], PartitionFilters: [], PushedFilters: [], ReadSchema: struct<point:binary,point_id:string,lat:double,long:double,point_wkt:string>
+   +- BroadcastExchange HashedRelationBroadcastMode(List(input[2, bigint, true]),false), [id=#31]
+      +- Project [point#6 AS point2#28, point_id#7 AS point_id2#29,  **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  [0] AS h3_index#47L]
+         +- Filter isnotnull( **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  [0])
+            +- FileScan parquet [point#6,point_id#7] Batched: false, DataFilters: [isnotnull( **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  [0])], Format: Parquet, Location: InMemoryFileIndex[file:/C:/projects/h3xwrapper/data/POI_TEST], PartitionFilters: [], PushedFilters: [], ReadSchema: struct<point:binary,point_id:string>
+
+
+
+SEDONA:
+== Physical Plan ==
+*(1) Project [point#6, point_id#7, lat#8, long#9, point_wkt#10, point2#28, point_id2#29]
++- BroadcastIndexJoin meter_point#88: geometry, RightSide, LeftSide, Inner, INTERSECTS, ( **org.apache.spark.sql.sedona_sql.expressions.ST_Distance**   <= 1000.0) ST_INTERSECTS(meter_point#88, meter_point2#95)
+   :- Project [point#6, point_id#7, lat#8, long#9, point_wkt#10,  **org.apache.spark.sql.sedona_sql.expressions.ST_Transform**   AS meter_point#88]
+   :  +- FileScan parquet [point#6,point_id#7,lat#8,long#9,point_wkt#10] Batched: false, DataFilters: [], Format: Parquet, Location: InMemoryFileIndex[file:/C:/projects/h3xwrapper/data/POI_TEST], PartitionFilters: [], PushedFilters: [], ReadSchema: struct<point:binary,point_id:string,lat:double,long:double,point_wkt:string>
+   +- SpatialIndex meter_point2#95: geometry, QUADTREE, false, false, 1000.0
+      +- Project [point#6 AS point2#28, point_id#7 AS point_id2#29,  **org.apache.spark.sql.sedona_sql.expressions.ST_Transform**   AS meter_point2#95]
+         +- FileScan parquet [point#6,point_id#7] Batched: false, DataFilters: [], Format: Parquet, Location: InMemoryFileIndex[file:/C:/projects/h3xwrapper/data/POI_TEST], PartitionFilters: [], PushedFilters: [], ReadSchema: struct<point:binary,point_id:string>
+
+
+POINTS_IN_RANGE_FROM_POLYGON
+
+H3:
+
+*(2) Project [h3_index#46L, zc_id#16, zc_shape#17, zc_shape_wkt#18, point#6, point_id#7, lat#8, long#9, point_wkt#10]
++- BroadcastHashJoin [h3_index#46L], [h3_index#58L], Inner, BuildRight, ( **org.apache.spark.sql.sedona_sql.expressions.ST_Distance**   <= 10000.0), false
+   :- *(1) Filter isnotnull(h3_index#46L)
+   :  +- Generate explode( **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  ), [zc_id#16, zc_shape#17, zc_shape_wkt#18, meter_zc_shape#28], false, [h3_index#46L]
+   :     +- Project [zc_id#16, zc_shape#17, zc_shape_wkt#18,  **org.apache.spark.sql.sedona_sql.expressions.ST_Transform**   AS meter_zc_shape#28,  **org.apache.spark.sql.sedona_sql.expressions.ST_Transform**   AS buffer_zc_shape#39]
+   :        +- Filter ((size( **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  , true) > 0) AND isnotnull( **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  ))
+   :           +- FileScan parquet [zc_id#16,zc_shape#17,zc_shape_wkt#18] Batched: false, DataFilters: [(size( **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  , true) > 0), isnotnull( **..., Format: Parquet, Location: InMemoryFileIndex[file:/C:/projects/h3xwrapper/data/ZIP_CODE_SHAPES_TEST], PartitionFilters: [], PushedFilters: [], ReadSchema: struct<zc_id:string,zc_shape:binary,zc_shape_wkt:string>
+   +- BroadcastExchange HashedRelationBroadcastMode(List(input[5, bigint, true]),false), [id=#31]
+      +- Project [point#6, point_id#7, lat#8, long#9, point_wkt#10,  **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  [0] AS h3_index#58L,  **org.apache.spark.sql.sedona_sql.expressions.ST_Transform**   AS meter_point#65]
+         +- Filter isnotnull( **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  [0])
+            +- FileScan parquet [point#6,point_id#7,lat#8,long#9,point_wkt#10] Batched: false, DataFilters: [isnotnull( **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  [0])], Format: Parquet, Location: InMemoryFileIndex[file:/C:/projects/h3xwrapper/data/POI_TEST], PartitionFilters: [], PushedFilters: [], ReadSchema: struct<point:binary,point_id:string,lat:double,long:double,point_wkt:string>
+
+
+SEDONA:
+== Physical Plan ==
+*(1) Project [zc_id#16, zc_shape#93, zc_shape_wkt#18, point#6, point_id#7, lat#8, long#9, point_wkt#10]
++- BroadcastIndexJoin meter_zc_shape#97: geometry, RightSide, LeftSide, Inner, INTERSECTS, ( **org.apache.spark.sql.sedona_sql.expressions.ST_Distance**   <= 10000.0) ST_INTERSECTS(meter_zc_shape#97, meter_point#102)
+   :- Project [zc_id#16,  **org.apache.spark.sql.sedona_sql.expressions.ST_SimplifyPreserveTopology**   AS zc_shape#93, zc_shape_wkt#18,  **org.apache.spark.sql.sedona_sql.expressions.ST_Transform**   AS meter_zc_shape#97]
+   :  +- FileScan parquet [zc_id#16,zc_shape#17,zc_shape_wkt#18] Batched: false, DataFilters: [], Format: Parquet, Location: InMemoryFileIndex[file:/C:/projects/h3xwrapper/data/ZIP_CODE_SHAPES_TEST], PartitionFilters: [], PushedFilters: [], ReadSchema: struct<zc_id:string,zc_shape:binary,zc_shape_wkt:string>
+   +- SpatialIndex meter_point#102: geometry, QUADTREE, false, false, 10000.0
+      +- Project [point#6, point_id#7, lat#8, long#9, point_wkt#10,  **org.apache.spark.sql.sedona_sql.expressions.ST_Transform**   AS meter_point#102]
+         +- FileScan parquet [point#6,point_id#7,lat#8,long#9,point_wkt#10] Batched: false, DataFilters: [], Format: Parquet, Location: InMemoryFileIndex[file:/C:/projects/h3xwrapper/data/POI_TEST], PartitionFilters: [], PushedFilters: [], ReadSchema: struct<point:binary,point_id:string,lat:double,long:double,point_wkt:string>
+
+
+POLYGONS_IN_RANGE_FROM_POLYGON
+
+H3:
+== Physical Plan ==
+*(2) Project [h3_index#53L, zc_id#16, zc_shape#17, zc_shape_wkt#18, bg_id#22, bg_shape#23, bg_shape_wkt#24]
++- BroadcastHashJoin [h3_index#53L], [h3_index#70L], Inner, BuildRight, ( **org.apache.spark.sql.sedona_sql.expressions.ST_Distance**   <= 5000.0), false
+   :- *(1) Filter isnotnull(h3_index#53L)
+   :  +- Generate explode(h3_index#45), [zc_id#16, zc_shape#17, zc_shape_wkt#18, meter_zc_shape#28], false, [h3_index#53L]
+   :     +- Project [zc_id#16, zc_shape#17, zc_shape_wkt#18,  **org.apache.spark.sql.sedona_sql.expressions.ST_Transform**   AS meter_zc_shape#28,  **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**   AS h3_index#45]
+   :        +- Filter ((size( **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  , true) > 0) AND isnotnull( **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  ))
+   :           +- FileScan parquet [zc_id#16,zc_shape#17,zc_shape_wkt#18] Batched: false, DataFilters: [(size( **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  , true) > 0), isnotnull( **..., Format: Parquet, Location: InMemoryFileIndex[file:/C:/projects/h3xwrapper/data/ZIP_CODE_SHAPES_TEST], PartitionFilters: [], PushedFilters: [], ReadSchema: struct<zc_id:string,zc_shape:binary,zc_shape_wkt:string>
+   +- BroadcastExchange HashedRelationBroadcastMode(List(input[3, bigint, true]),false), [id=#31]
+      +- Project [bg_id#22, bg_shape#23, bg_shape_wkt#24,  **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  [0] AS h3_index#70L,  **org.apache.spark.sql.sedona_sql.expressions.ST_Transform**   AS meter_bg_shape#80]
+         +- Filter isnotnull( **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  [0])
+            +- FileScan parquet [bg_id#22,bg_shape#23,bg_shape_wkt#24] Batched: false, DataFilters: [isnotnull( **org.apache.spark.sql.sedona_sql.expressions.ST_H3CellIDs**  [0])], Format: Parquet, Location: InMemoryFileIndex[file:/C:/projects/h3xwrapper/data/BLOCK_GROUP_SHAPES_TEST], PartitionFilters: [], PushedFilters: [], ReadSchema: struct<bg_id:string,bg_shape:binary,bg_shape_wkt:string>
+
+SEDONA:
+== Physical Plan ==
+*(1) Project [zc_id#16, zc_shape#102, zc_shape_wkt#18, bg_id#22, bg_shape#23, bg_shape_wkt#24]
++- BroadcastIndexJoin meter_zc_shape#106: geometry, RightSide, LeftSide, Inner, INTERSECTS, ( **org.apache.spark.sql.sedona_sql.expressions.ST_Distance**   <= 5000.0) ST_INTERSECTS(meter_zc_shape#106, meter_bg_shape#111)
+   :- Project [zc_id#16,  **org.apache.spark.sql.sedona_sql.expressions.ST_SimplifyPreserveTopology**   AS zc_shape#102, zc_shape_wkt#18,  **org.apache.spark.sql.sedona_sql.expressions.ST_Transform**   AS meter_zc_shape#106]
+   :  +- FileScan parquet [zc_id#16,zc_shape#17,zc_shape_wkt#18] Batched: false, DataFilters: [], Format: Parquet, Location: InMemoryFileIndex[file:/C:/projects/h3xwrapper/data/ZIP_CODE_SHAPES_TEST], PartitionFilters: [], PushedFilters: [], ReadSchema: struct<zc_id:string,zc_shape:binary,zc_shape_wkt:string>
+   +- SpatialIndex meter_bg_shape#111: geometry, QUADTREE, false, false, 5000.0
+      +- Project [bg_id#22, bg_shape#23, bg_shape_wkt#24,  **org.apache.spark.sql.sedona_sql.expressions.ST_Transform**   AS meter_bg_shape#111]
+         +- FileScan parquet [bg_id#22,bg_shape#23,bg_shape_wkt#24] Batched: false, DataFilters: [], Format: Parquet, Location: InMemoryFileIndex[file:/C:/projects/h3xwrapper/data/BLOCK_GROUP_SHAPES_TEST], PartitionFilters: [], PushedFilters: [], ReadSchema: struct<bg_id:string,bg_shape:binary,bg_shape_wkt:string>
+
+
+

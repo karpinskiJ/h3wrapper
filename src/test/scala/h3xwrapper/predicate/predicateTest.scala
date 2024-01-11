@@ -72,6 +72,8 @@ class predicateTest extends FlatSpec with BeforeAndAfter {
       , "zc_shape"
       , blockGroupShapes
       , "bg_shape")
+    h3Result.explain()
+    sedonaResult.explain()
 
     assertResult(sedonaResult.count())(h3Result.count())
     assertResult(transformResultsToList(sedonaResult, "zc_id", "bg_id"))(transformResultsToList(h3Result, "zc_id", "bg_id"))
@@ -82,8 +84,11 @@ class predicateTest extends FlatSpec with BeforeAndAfter {
     val pointsSource: DataFrame = poiPoints
     val pointsTarget: DataFrame = poiPoints.select(col("point").as("point2"), col("point_id").as("point_id2"))
 
-    val h3Result = h3.getPointsInRangeFromPoints(poiPoints, "point", pointsTarget, "point2", 10000.0, 7)
-    val sedonaResult = sedona.sedonaGetPointsInRangeFromPoints(pointsSource, "point", pointsTarget, "point2", 10000)
+    val h3Result = h3.getPointsInRangeFromPoints(poiPoints, "point", pointsTarget, "point2", 1000, 10)
+    val sedonaResult = sedona.sedonaGetPointsInRangeFromPoints(pointsSource, "point", pointsTarget, "point2", 1000)
+
+    h3Result.explain()
+    sedonaResult.explain()
 
     assertResult(sedonaResult.count())(h3Result.count())
     assertResult(transformResultsToList(sedonaResult, "point_id", "point_id2"))(transformResultsToList(h3Result, "point_id", "point_id2"))
@@ -107,7 +112,8 @@ class predicateTest extends FlatSpec with BeforeAndAfter {
         , "point"
         , 10000.0)
 
-
+    h3Result.explain()
+    sedonaResult.explain()
     assertResult(sedonaResult.count)(h3Result.count())
     assertResult(transformResultsToList(sedonaResult, "point_id", "zc_id"))(transformResultsToList(h3Result, "point_id", "zc_id"))
   }
@@ -126,7 +132,8 @@ class predicateTest extends FlatSpec with BeforeAndAfter {
         , blockGroupShapes
         , "bg_shape"
         , 5000)
-
+    h3Result.explain()
+    sedonaResult.explain()
     assertResult(sedonaResult.count())(h3Result.count())
     assertResult(transformResultsToList(sedonaResult, "bg_id", "zc_id"))(transformResultsToList(h3Result, "bg_id", "zc_id"))
   }
